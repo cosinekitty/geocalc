@@ -1,0 +1,378 @@
+<html>
+<head>
+<title>Azimuth/Distance calculator by Don Cross</title>
+</head>
+<body>
+
+<script language="Javascript"> //<![CDATA[
+    function $ (id)
+    {
+        return document.getElementById (id);
+    }
+
+    function ParseAngle (id, limit)
+    {
+        var angle = parseFloat ($(id).value);
+        if (isNaN (angle) || (angle < -limit) || (angle > limit)) {
+            $('ErrorMessage').innerHTML = "Invalid angle value.";
+            $(id).focus();
+            return null;
+        } else {
+            return angle;
+        }
+    }
+
+    function ParseElevation (id)
+    {
+        var angle = parseFloat ($(id).value);
+        if (isNaN (angle)) {
+            $('ErrorMessage').innerHTML = "Invalid elevation value.";
+            $(id).focus();
+            return null;
+        } else {
+            return angle;
+        }
+    }
+
+    function ParseLocation (prefix)
+    {
+        var lat = ParseAngle (prefix + '_lat', 90.0);
+        var location = null;
+        if (lat != null) {
+            var lon = ParseAngle (prefix + '_lon', 180.0);
+            if (lon != null) {
+                var elv = ParseElevation (prefix + '_elv');
+                if (elv != null) {
+                    location = {'lat':lat, 'lon':lon, 'elv':elv};
+                }
+            }
+        }
+        return location;
+    }
+
+    function EarthRadiusInMeters (latitudeRadians)      // latitude is geodetic, i.e. that reported by GPS
+    {
+        // http://en.wikipedia.org/wiki/Earth_radius
+        var a = 6378137.0;  // equatorial radius in meters
+        var b = 6356752.3;  // polar radius in meters
+        var cos = Math.cos (latitudeRadians);
+        var sin = Math.sin (latitudeRadians);
+        var t1 = a * a * cos;
+        var t2 = b * b * sin;
+        var t3 = a * cos;
+        var t4 = b * sin;
+        return Math.sqrt ((t1*t1 + t2*t2) / (t3*t3 + t4*t4));
+    }
+    
+    function GeocentricLatitude(lat)
+    {
+        // Convert geodetic latitude 'lat' to a geocentric latitude 'clat'.
+        // Geodetic latitude is the latitude as given by GPS.
+        // Geocentric latitude is the angle measured from center of Earth between a point and the equator.
+        // https://en.wikipedia.org/wiki/Latitude#Geocentric_latitude
+        var e2 = 0.00669437999014;
+        var clat = Math.atan((1.0 - e2) * Math.tan(lat));
+        return clat;
+    }
+    
+    function LocationToPoint(c, oblate)
+    {
+        // Convert (lat, lon, elv) to (x, y, z).
+        var lat = c.lat * Math.PI / 180.0;
+        var lon = c.lon * Math.PI / 180.0;
+        var radius = oblate ? EarthRadiusInMeters(lat) : 6371009;
+        var clat   = oblate ? GeocentricLatitude(lat)  : lat;
+        
+        var cosLon = Math.cos(lon);
+        var sinLon = Math.sin(lon);
+        var cosLat = Math.cos(clat);
+        var sinLat = Math.sin(clat);
+        var x = radius * cosLon * cosLat;
+        var y = radius * sinLon * cosLat;
+        var z = radius * sinLat;
+        
+        // We used geocentric latitude to calculate (x,y,z) on the Earth's ellipsoid.
+        // Now we use geodetic latitude to calculate normal vector from the surface, to correct for elevation.
+        var cosGlat = Math.cos(lat);
+        var sinGlat = Math.sin(lat);
+        
+        var nx = cosGlat * cosLon;
+        var ny = cosGlat * sinLon;
+        var nz = sinGlat;
+        
+        x += c.elv * nx;
+        y += c.elv * ny;
+        z += c.elv * nz;
+        
+        return {'x':x, 'y':y, 'z':z, 'radius':radius, 'nx':nx, 'ny':ny, 'nz':nz};
+    }
+
+    function Distance (ap, bp)
+    {
+        var dx = ap.x - bp.x;
+        var dy = ap.y - bp.y;
+        var dz = ap.z - bp.z;
+        return Math.sqrt (dx*dx + dy*dy + dz*dz);
+    }
+
+    function RotateGlobe (b, a, bradius, aradius, oblate)
+    {
+        // Get modified coordinates of 'b' by rotating the globe so that 'a' is at lat=0, lon=0.
+        var br = {'lat':b.lat, 'lon':(b.lon - a.lon), 'elv':b.elv};
+        var brp = LocationToPoint(br, oblate);
+
+        // Rotate brp cartesian coordinates around the z-axis by a.lon degrees,
+        // then around the y-axis by a.lat degrees.
+        // Though we are decreasing by a.lat degrees, as seen above the y-axis,
+        // this is a positive (counterclockwise) rotation (if B's longitude is east of A's).
+        // However, from this point of view the x-axis is pointing left.
+        // So we will look the other way making the x-axis pointing right, the z-axis
+        // pointing up, and the rotation treated as negative.
+
+        var alat = -a.lat * Math.PI / 180.0;
+        if (oblate) {
+            alat = GeocentricLatitude(alat);
+        }
+        var acos = Math.cos(alat);
+        var asin = Math.sin(alat);
+
+        var bx = (brp.x * acos) - (brp.z * asin);
+        var by = brp.y;
+        var bz = (brp.x * asin) + (brp.z * acos);
+
+        return {'x':bx, 'y':by, 'z':bz, 'radius':bradius};
+    }
+    
+    function NormalizeVectorDiff(b, a)
+    {
+        // Calculate norm(b-a), where norm divides a vector by its length to produce a unit vector.
+        var dx = b.x - a.x;
+        var dy = b.y - a.y;
+        var dz = b.z - a.z;
+        var dist2 = dx*dx + dy*dy + dz*dz;
+        if (dist2 == 0) {
+            return null;
+        }
+        var dist = Math.sqrt(dist2);
+        return { 'x':(dx/dist), 'y':(dy/dist), 'z':(dz/dist), 'radius':1.0 };
+    }
+
+    function Calculate(oblate)
+    {
+        // clear any previous output or error message...
+        $('ErrorMessage').innerHTML = '';
+        $('div_Distance').innerHTML = '';
+        $('div_Azimuth' ).innerHTML = '';
+        $('div_Altitude').innerHTML = '';
+        
+        var a = ParseLocation ('a');
+        if (a != null) {
+            var b = ParseLocation ('b');
+            if (b != null) {
+                var ap = LocationToPoint(a, oblate);
+                var bp = LocationToPoint(b, oblate);
+                var distKm = 0.001 * Distance(ap,bp);
+                $('div_Distance').innerHTML = distKm.toFixed(3) + '&nbsp;km';
+
+                // Let's use a trick to calculate azimuth:
+                // Rotate the globe so that point A looks like latitude 0, longitude 0.
+                // We keep the actual radii calculated based on the oblate geoid,
+                // but use angles based on subtraction.
+                // Point A will be at x=radius, y=0, z=0.
+                // Vector difference B-A will have dz = N/S component, dy = E/W component.                
+                var br = RotateGlobe (b, a, bp.radius, ap.radius, oblate);
+                if (br.z*br.z + br.y*br.y > 1.0e-6) {
+                    var theta = Math.atan2(br.z, br.y) * 180.0 / Math.PI;
+                    var azimuth = 90.0 - theta;
+                    if (azimuth < 0.0) {
+                        azimuth += 360.0;
+                    }
+                    if (azimuth > 360.0) {
+                        azimuth -= 360.0;
+                    }
+                    $('div_Azimuth').innerHTML = azimuth.toFixed(4) + '&deg;';
+                }
+                
+                var bma = NormalizeVectorDiff(bp, ap);
+                if (bma != null) {                    
+                    // Calculate altitude, which is the angle above the horizon of B as seen from A.
+                    // Almost always, B will actually be below the horizon, so the altitude will be negative.
+                    // The dot product of bma and norm = cos(zenith_angle), and zenith_angle = (90 deg) - altitude.
+                    // So altitude = 90 - acos(dotprod).
+                    var altitude = 90.0 - (180.0 / Math.PI)*Math.acos(bma.x*ap.nx + bma.y*ap.ny + bma.z*ap.nz);
+                    $('div_Altitude').innerHTML = altitude.toFixed(4).replace(/-/g,'&minus;') + '&deg;';
+                }
+            }
+        }
+    }
+
+    var save_b_lat = '';    // holds point B latitude  from non-geostationary mode
+    var save_b_elv = '';    // holds point B elevation from non-geostationary mode
+
+    function OnGeoCheck()
+    {
+        // The geostationary checkbox was clicked.
+        var geomode = $('cb_geo').checked;
+        if (geomode) {
+            // Save values so user doesn't lose them on accidental/curiosity click.
+            save_b_lat = $('b_lat').value;
+            save_b_elv = $('b_elv').value;
+
+            // Fill in the values for geostationary orbit.
+            $('b_lat').value = '0';         // assume satellite is directly above equator.
+            $('b_elv').value = '35786000';  // 35,786 km above equator.
+
+            // Disable editing of point B latitude and elevation while box is checked.
+            $('b_lat').disabled = true;
+            $('b_elv').disabled = true;
+        } else {
+            // Restore saved values to edit boxes, so user doesn't lose them.
+            $('b_lat').value = save_b_lat;
+            $('b_elv').value = save_b_elv;
+
+            // Enable editing of point B latitude and elevation while box is checked.
+            $('b_lat').disabled = false;
+            $('b_elv').disabled = false;
+        }
+    }
+// ]]>
+</script>
+
+<h1>Azimuth/Distance calculator - by <a href="/">Don Cross</a></h1>
+<p>
+    Given the latitude, longitude, and elevation of two points on the Earth,
+    this calculator determines the azimuth (compass direction) and distance
+    of the second point (B) as seen from the first point (A).
+</p>
+
+<p>
+    <b>See also:</b> <a href="latlon">Latitude/Longitude Calculator</a>.
+    That page performs the inverse calculation: it figures out the coordinates
+    of a target point, given the coordinates of an origin point, an azimuth, 
+    and a distance.
+</p>
+
+
+<table>
+    <tr>
+        <td></td>
+        <td align="center">Latitude (&deg;N)</td>
+        <td align="center">Longitude (&deg;E)</td>
+        <td align="center">Elevation (meters)</td>
+    </tr>
+
+    <tr>
+        <td>Point A</td>
+        <td><input type="text" id="a_lat" size="12" value=""/></td>
+        <td><input type="text" id="a_lon" size="12" value=""/></td>
+        <td><input type="text" id="a_elv" size="12" value="0"/></td>
+    </tr>
+
+    <tr>
+        <td>Point B</td>
+        <td><input type="text" id="b_lat" size="12" value=""/></td>
+        <td><input type="text" id="b_lon" size="12" value=""/></td>
+        <td><input type="text" id="b_elv" size="12" value="0"/></td>
+        <td><input type="checkbox" id="cb_geo" value="" onclick="OnGeoCheck()" />Geostationary satellite</td>        
+    </tr>
+</table>
+
+<p>
+    <input type="button" value="Calculate" onclick="Calculate(true)"/>
+    &nbsp;&nbsp;
+    <span id="ErrorMessage" style="color:red;"></span>
+</p>
+
+<table border="1" cellpadding="5" cellspacing="0">
+    <tr>
+        <td>Quantity</td>
+        <td width="70">Value</td>
+    </tr>
+
+    <tr>
+        <td>Azimuth</td>
+        <td><div id="div_Azimuth"></div></td>
+    </tr>
+
+    <tr>
+        <td>Distance</td>
+        <td><div id="div_Distance"></div></td>
+    </tr>
+
+    <tr>
+        <td>Altitude</td>
+        <td><div id="div_Altitude"></div></td>
+    </tr>
+</table>
+
+<h3>Notes</h3>
+
+<ul>
+    <li>
+        If a point is North of the equator, make its latitude positive.  If South, it is negative.
+    </li>
+
+    <li>
+        If a point is East of the prime meridian (Greenwich, England), its longitude is positive.
+        <b>For anywhere in the United States, the longitude is a negative number because
+        we are west of England!</b>
+    </li>
+
+    <li>
+        Elevation is how many meters above sea level a point is.
+        If you don't know the elevation of the points involved,
+        you can still get a pretty accurate answer
+        in most cases by leaving it at 0 (zero).
+        Use a negative value for points beneath sea level.
+    </li>
+
+    <li>
+        The distance is defined as the length of the straight line between the points,
+        ignoring the Earth's curvature.
+        If the points are far enough apart, chances are this straight line goes right through the Earth.
+    </li>
+
+    <li>
+        The azimuth is how many degrees clockwise from North you have to rotate in order
+        to face Point B when standing at Point A.
+    </li>
+
+    <li>
+        The altitude is how many degrees above (if positive) or below (if negative) the horizon
+        Point B is when seen from Point A.
+        For example, if A and B are both at sea level, as B gets farther away, it
+        gradually dips below the horizon because of the Earth's curvature.
+    </li>
+
+    <li>
+        This calculator corrects for oblateness of the Earth.  As you get closer to the equator,
+        the distance from the center of the Earth is greater than it is near the poles.
+        See the <a href="http://en.wikipedia.org/wiki/Earth_radius">Earth radius</a> article
+        on Wikipedia for more information.
+    </li>
+
+    <li>
+        I created this tool to help understand the directionality of the magnetic loop
+        antenna on my home-made <a href="radio/">reflex radio</a>.
+        I used the
+        <a href="http://www.fcc.gov/mb/audio/amq.html">FCC online AM radio station database</a>
+        to find the latitude and longitude of a broadcast tower I am tuned to, and
+        to confirm that when the magnetic loop antenna faces it, the azimuth is consistent
+        with what I calculate here.
+    </li>
+
+    <li>
+        <b>STEAL MY CODE!</b> If you want to see how this works, or even adapt it for use
+        on your own web site, just use your browser's &quot;View Source&quot; option to see
+        all the HTML and Javascript code. It's all right here on this page.
+        If you do copy the code and use it somewhere else, I would appreciate a link
+        back to this page as credit.
+    </li>
+
+    <li>
+        See also: <a href="http://www.satsig.net/sf.htm">Satellite Finder</a> by Satellite Signals, Ltd.
+    </li>
+</ul>
+
+</body>
+</html>
