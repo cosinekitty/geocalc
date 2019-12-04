@@ -1,10 +1,11 @@
+<!DOCTYPE html>
 <html>
 <head>
 <title>Azimuth/Distance calculator by Don Cross</title>
 </head>
 <body>
 
-<script language="Javascript"> //<![CDATA[
+<script language="Javascript">
     function $ (id)
     {
         return document.getElementById (id);
@@ -63,7 +64,7 @@
         var t4 = b * sin;
         return Math.sqrt ((t1*t1 + t2*t2) / (t3*t3 + t4*t4));
     }
-    
+
     function GeocentricLatitude(lat)
     {
         // Convert geodetic latitude 'lat' to a geocentric latitude 'clat'.
@@ -74,15 +75,15 @@
         var clat = Math.atan((1.0 - e2) * Math.tan(lat));
         return clat;
     }
-    
-    function LocationToPoint(c, oblate)
+
+    function LocationToPoint(c)
     {
         // Convert (lat, lon, elv) to (x, y, z).
         var lat = c.lat * Math.PI / 180.0;
         var lon = c.lon * Math.PI / 180.0;
-        var radius = oblate ? EarthRadiusInMeters(lat) : 6371009;
-        var clat   = oblate ? GeocentricLatitude(lat)  : lat;
-        
+        var radius = EarthRadiusInMeters(lat);
+        var clat   = GeocentricLatitude(lat);
+
         var cosLon = Math.cos(lon);
         var sinLon = Math.sin(lon);
         var cosLat = Math.cos(clat);
@@ -90,20 +91,20 @@
         var x = radius * cosLon * cosLat;
         var y = radius * sinLon * cosLat;
         var z = radius * sinLat;
-        
+
         // We used geocentric latitude to calculate (x,y,z) on the Earth's ellipsoid.
         // Now we use geodetic latitude to calculate normal vector from the surface, to correct for elevation.
         var cosGlat = Math.cos(lat);
         var sinGlat = Math.sin(lat);
-        
+
         var nx = cosGlat * cosLon;
         var ny = cosGlat * sinLon;
         var nz = sinGlat;
-        
+
         x += c.elv * nx;
         y += c.elv * ny;
         z += c.elv * nz;
-        
+
         return {'x':x, 'y':y, 'z':z, 'radius':radius, 'nx':nx, 'ny':ny, 'nz':nz};
     }
 
@@ -115,11 +116,11 @@
         return Math.sqrt (dx*dx + dy*dy + dz*dz);
     }
 
-    function RotateGlobe (b, a, bradius, aradius, oblate)
+    function RotateGlobe (b, a, bradius, aradius)
     {
         // Get modified coordinates of 'b' by rotating the globe so that 'a' is at lat=0, lon=0.
         var br = {'lat':b.lat, 'lon':(b.lon - a.lon), 'elv':b.elv};
-        var brp = LocationToPoint(br, oblate);
+        var brp = LocationToPoint(br);
 
         // Rotate brp cartesian coordinates around the z-axis by a.lon degrees,
         // then around the y-axis by a.lat degrees.
@@ -129,10 +130,7 @@
         // So we will look the other way making the x-axis pointing right, the z-axis
         // pointing up, and the rotation treated as negative.
 
-        var alat = -a.lat * Math.PI / 180.0;
-        if (oblate) {
-            alat = GeocentricLatitude(alat);
-        }
+        var alat = GeocentricLatitude(-a.lat * Math.PI / 180.0);
         var acos = Math.cos(alat);
         var asin = Math.sin(alat);
 
@@ -142,7 +140,7 @@
 
         return {'x':bx, 'y':by, 'z':bz, 'radius':bradius};
     }
-    
+
     function NormalizeVectorDiff(b, a)
     {
         // Calculate norm(b-a), where norm divides a vector by its length to produce a unit vector.
@@ -157,20 +155,20 @@
         return { 'x':(dx/dist), 'y':(dy/dist), 'z':(dz/dist), 'radius':1.0 };
     }
 
-    function Calculate(oblate)
+    function Calculate()
     {
         // clear any previous output or error message...
         $('ErrorMessage').innerHTML = '';
         $('div_Distance').innerHTML = '';
         $('div_Azimuth' ).innerHTML = '';
         $('div_Altitude').innerHTML = '';
-        
+
         var a = ParseLocation ('a');
         if (a != null) {
             var b = ParseLocation ('b');
             if (b != null) {
-                var ap = LocationToPoint(a, oblate);
-                var bp = LocationToPoint(b, oblate);
+                var ap = LocationToPoint(a);
+                var bp = LocationToPoint(b);
                 var distKm = 0.001 * Distance(ap,bp);
                 $('div_Distance').innerHTML = distKm.toFixed(3) + '&nbsp;km';
 
@@ -179,8 +177,8 @@
                 // We keep the actual radii calculated based on the oblate geoid,
                 // but use angles based on subtraction.
                 // Point A will be at x=radius, y=0, z=0.
-                // Vector difference B-A will have dz = N/S component, dy = E/W component.                
-                var br = RotateGlobe (b, a, bp.radius, ap.radius, oblate);
+                // Vector difference B-A will have dz = N/S component, dy = E/W component.
+                var br = RotateGlobe (b, a, bp.radius, ap.radius);
                 if (br.z*br.z + br.y*br.y > 1.0e-6) {
                     var theta = Math.atan2(br.z, br.y) * 180.0 / Math.PI;
                     var azimuth = 90.0 - theta;
@@ -192,9 +190,9 @@
                     }
                     $('div_Azimuth').innerHTML = azimuth.toFixed(4) + '&deg;';
                 }
-                
+
                 var bma = NormalizeVectorDiff(bp, ap);
-                if (bma != null) {                    
+                if (bma != null) {
                     // Calculate altitude, which is the angle above the horizon of B as seen from A.
                     // Almost always, B will actually be below the horizon, so the altitude will be negative.
                     // The dot product of bma and norm = cos(zenith_angle), and zenith_angle = (90 deg) - altitude.
@@ -235,7 +233,6 @@
             $('b_elv').disabled = false;
         }
     }
-// ]]>
 </script>
 
 <h1>Azimuth/Distance calculator - by <a href="/">Don Cross</a></h1>
@@ -248,7 +245,7 @@
 <p>
     <b>See also:</b> <a href="latlon">Latitude/Longitude Calculator</a>.
     That page performs the inverse calculation: it figures out the coordinates
-    of a target point, given the coordinates of an origin point, an azimuth, 
+    of a target point, given the coordinates of an origin point, an azimuth,
     and a distance.
 </p>
 
@@ -273,12 +270,12 @@
         <td><input type="text" id="b_lat" size="12" value=""/></td>
         <td><input type="text" id="b_lon" size="12" value=""/></td>
         <td><input type="text" id="b_elv" size="12" value="0"/></td>
-        <td><input type="checkbox" id="cb_geo" value="" onclick="OnGeoCheck()" />Geostationary satellite</td>        
+        <td><input type="checkbox" id="cb_geo" value="" onclick="OnGeoCheck()" />Geostationary satellite</td>
     </tr>
 </table>
 
 <p>
-    <input type="button" value="Calculate" onclick="Calculate(true)"/>
+    <input type="button" value="Calculate" onclick="Calculate()"/>
     &nbsp;&nbsp;
     <span id="ErrorMessage" style="color:red;"></span>
 </p>
