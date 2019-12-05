@@ -235,20 +235,20 @@
     }
 </script>
 
-<h1>Azimuth/Distance calculator - by <a href="/">Don Cross</a></h1>
+<h1>Azimuth/Distance calculator - by Don Cross</h1>
 <p>
     Given the latitude, longitude, and elevation of two points on the Earth,
     this calculator determines the azimuth (compass direction) and distance
     of the second point (B) as seen from the first point (A).
 </p>
-
 <p>
-    <b>See also:</b> <a href="latlon">Latitude/Longitude Calculator</a>.
-    That page performs the inverse calculation: it figures out the coordinates
-    of a target point, given the coordinates of an origin point, an azimuth,
-    and a distance.
+    <a href="https://medium.com/@cosinekitty/calculating-heading-distance-and-altitude-from-a-pair-of-gps-locations-36b4325d8ab0">Read more about this calculator</a>.
+</p>
+<p>
+    <a href="https://github.com/cosinekitty/geocalc">Source code is available on GitHub.</a>
 </p>
 
+<hr/>
 
 <table>
     <tr>
@@ -273,6 +273,8 @@
         <td><input type="checkbox" id="cb_geo" value="" onclick="OnGeoCheck()" />Geostationary satellite</td>
     </tr>
 </table>
+
+<hr>
 
 <p>
     <input type="button" value="Calculate" onclick="Calculate()"/>
@@ -301,75 +303,6 @@
         <td><div id="div_Altitude"></div></td>
     </tr>
 </table>
-
-<h3>Notes</h3>
-
-<ul>
-    <li>
-        If a point is North of the equator, make its latitude positive.  If South, it is negative.
-    </li>
-
-    <li>
-        If a point is East of the prime meridian (Greenwich, England), its longitude is positive.
-        <b>For anywhere in the United States, the longitude is a negative number because
-        we are west of England!</b>
-    </li>
-
-    <li>
-        Elevation is how many meters above sea level a point is.
-        If you don't know the elevation of the points involved,
-        you can still get a pretty accurate answer
-        in most cases by leaving it at 0 (zero).
-        Use a negative value for points beneath sea level.
-    </li>
-
-    <li>
-        The distance is defined as the length of the straight line between the points,
-        ignoring the Earth's curvature.
-        If the points are far enough apart, chances are this straight line goes right through the Earth.
-    </li>
-
-    <li>
-        The azimuth is how many degrees clockwise from North you have to rotate in order
-        to face Point B when standing at Point A.
-    </li>
-
-    <li>
-        The altitude is how many degrees above (if positive) or below (if negative) the horizon
-        Point B is when seen from Point A.
-        For example, if A and B are both at sea level, as B gets farther away, it
-        gradually dips below the horizon because of the Earth's curvature.
-    </li>
-
-    <li>
-        This calculator corrects for oblateness of the Earth.  As you get closer to the equator,
-        the distance from the center of the Earth is greater than it is near the poles.
-        See the <a href="http://en.wikipedia.org/wiki/Earth_radius">Earth radius</a> article
-        on Wikipedia for more information.
-    </li>
-
-    <li>
-        I created this tool to help understand the directionality of the magnetic loop
-        antenna on my home-made <a href="radio/">reflex radio</a>.
-        I used the
-        <a href="http://www.fcc.gov/mb/audio/amq.html">FCC online AM radio station database</a>
-        to find the latitude and longitude of a broadcast tower I am tuned to, and
-        to confirm that when the magnetic loop antenna faces it, the azimuth is consistent
-        with what I calculate here.
-    </li>
-
-    <li>
-        <b>STEAL MY CODE!</b> If you want to see how this works, or even adapt it for use
-        on your own web site, just use your browser's &quot;View Source&quot; option to see
-        all the HTML and Javascript code. It's all right here on this page.
-        If you do copy the code and use it somewhere else, I would appreciate a link
-        back to this page as credit.
-    </li>
-
-    <li>
-        See also: <a href="http://www.satsig.net/sf.htm">Satellite Finder</a> by Satellite Signals, Ltd.
-    </li>
-</ul>
 
 </body>
 </html>
