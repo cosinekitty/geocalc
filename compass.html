@@ -14,7 +14,7 @@
     function ParseAngle (id, limit)
     {
         var angle = parseFloat ($(id).value);
-        if (isNaN (angle) || (angle < -limit) || (angle > limit)) {
+        if (isNaN(angle) || (angle < -limit) || (angle > limit)) {
             $('ErrorMessage').innerHTML = "Invalid angle value.";
             $(id).focus();
             return null;
@@ -44,25 +44,26 @@
             if (lon != null) {
                 var elv = ParseElevation (prefix + '_elv');
                 if (elv != null) {
-                    location = {'lat':lat, 'lon':lon, 'elv':elv};
+                    location = {lat:lat, lon:lon, elv:elv};
                 }
             }
         }
         return location;
     }
 
-    function EarthRadiusInMeters (latitudeRadians)      // latitude is geodetic, i.e. that reported by GPS
+    function EarthRadiusInMeters(latitudeRadians)
     {
+        // latitudeRadians is geodetic, i.e. that reported by GPS.
         // http://en.wikipedia.org/wiki/Earth_radius
         var a = 6378137.0;  // equatorial radius in meters
         var b = 6356752.3;  // polar radius in meters
-        var cos = Math.cos (latitudeRadians);
-        var sin = Math.sin (latitudeRadians);
+        var cos = Math.cos(latitudeRadians);
+        var sin = Math.sin(latitudeRadians);
         var t1 = a * a * cos;
         var t2 = b * b * sin;
         var t3 = a * cos;
         var t4 = b * sin;
-        return Math.sqrt ((t1*t1 + t2*t2) / (t3*t3 + t4*t4));
+        return Math.sqrt((t1*t1 + t2*t2) / (t3*t3 + t4*t4));
     }
 
     function GeocentricLatitude(lat)
@@ -105,7 +106,7 @@
         y += c.elv * ny;
         z += c.elv * nz;
 
-        return {'x':x, 'y':y, 'z':z, 'radius':radius, 'nx':nx, 'ny':ny, 'nz':nz};
+        return {x:x, y:y, z:z, radius:radius, nx:nx, ny:ny, nz:nz};
     }
 
     function Distance (ap, bp)
@@ -119,7 +120,7 @@
     function RotateGlobe (b, a, bradius, aradius)
     {
         // Get modified coordinates of 'b' by rotating the globe so that 'a' is at lat=0, lon=0.
-        var br = {'lat':b.lat, 'lon':(b.lon - a.lon), 'elv':b.elv};
+        var br = {lat:b.lat, lon:(b.lon - a.lon), elv:b.elv};
         var brp = LocationToPoint(br);
 
         // Rotate brp cartesian coordinates around the z-axis by a.lon degrees,
@@ -138,7 +139,7 @@
         var by = brp.y;
         var bz = (brp.x * asin) + (brp.z * acos);
 
-        return {'x':bx, 'y':by, 'z':bz, 'radius':bradius};
+        return {x:bx, y:by, z:bz, radius:bradius};
     }
 
     function NormalizeVectorDiff(b, a)
@@ -152,7 +153,7 @@
             return null;
         }
         var dist = Math.sqrt(dist2);
-        return { 'x':(dx/dist), 'y':(dy/dist), 'z':(dz/dist), 'radius':1.0 };
+        return { x:(dx/dist), y:(dy/dist), z:(dz/dist), radius:1.0 };
     }
 
     function Calculate()
